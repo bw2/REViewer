@@ -131,23 +131,32 @@ static LocusResults analyzeLocus(
     return { scoredDiplotypes, lanePlots, metricsByVariant };
 }
 
-vector<string> getLocusIds(const RegionCatalog& catalog, const string& encoding)
+vector<string> getLocusIds(const RegionCatalog& catalog, const string& locusIdArg)
 {
-    vector<string> locusIds;
-    boost::split(locusIds, encoding, boost::is_any_of(","));
+    vector<RegionId> locusIds;
 
-    for (const auto& locusId : locusIds)
-    {
-        if (locusId.empty())
-        {
-            throw std::runtime_error("Empty locus ids are not allowed");
-        }
-
-        if (catalog.find(locusId) == catalog.end())
-        {
-            throw std::runtime_error(locusId + " is missing from the variant catalog");
-        }
+    if (locusIdArg.empty()) {
+		for (auto const & element : catalog) {
+			locusIds.push_back(element.first);
+			std::cout << element.first << std::endl;
+		}
     }
+    else {
+    	boost::split(locusIds, locusIdArg, boost::is_any_of(","));
+
+		for (const auto& locusId : locusIds)
+		{
+			if (locusId.empty())
+			{
+				throw std::runtime_error("Empty locus ids are not allowed");
+			}
+
+			if (catalog.find(locusId) == catalog.end())
+			{
+				throw std::runtime_error(locusId + " is missing from the variant catalog");
+			}
+		}
+	}
 
     return locusIds;
 }
@@ -193,22 +202,28 @@ int runWorkflow(const WorkflowArguments& args)
 
     for (const auto& locusId : locusIds)
     {
-        auto locusSpec = locusCatalog.at(locusId);
-        auto locusResults = analyzeLocus(args.referencePath, args.readsPath, args.vcfPath, locusId, locusSpec);
+        try {
+    	    auto locusSpec = locusCatalog.at(locusId);
+        	auto locusResults = analyzeLocus(args.referencePath, args.readsPath, args.vcfPath, locusId, locusSpec);
 
-        const auto svgPath = args.outputPrefix + "." + locusId + ".svg";
-        generateSvg(locusResults.lanePlots(), svgPath);
 
-        for (const auto& metrics : locusResults.metricsByVariant())
-        {
-            const auto& genotype = encode(metrics.genotype);
-            const auto& alleleDepth = encode(metrics.alleleDepth);
-            metricsFile << metrics.variantId << "\t" << genotype << "\t" << alleleDepth << std::endl;
-        }
+			const auto svgPath = args.outputPrefix + "." + locusId + ".svg";
+			generateSvg(locusResults.lanePlots(), svgPath);
 
-        for (const auto& diplotypeAndScore : locusResults.scoredDiplotypes())
-        {
-            phasingFile << locusId << "\t" << diplotypeAndScore.first << "\t" << diplotypeAndScore.second << std::endl;
+			for (const auto& metrics : locusResults.metricsByVariant())
+			{
+				const auto& genotype = encode(metrics.genotype);
+				const auto& alleleDepth = encode(metrics.alleleDepth);
+				metricsFile << metrics.variantId << "\t" << genotype << "\t" << alleleDepth << std::endl;
+			}
+
+			for (const auto& diplotypeAndScore : locusResults.scoredDiplotypes())
+			{
+				phasingFile << locusId << "\t" << diplotypeAndScore.first << "\t" << diplotypeAndScore.second << std::endl;
+			}
+ 		} catch(const std::exception & e) {
+			spdlog::error("Failed to analyze locus {}", locusId + ": " + e.what());
+			continue;
         }
     }
 
