@@ -91,7 +91,7 @@ private:
 
 static LocusResults analyzeLocus(
     const string& referencePath, const string& readsPath, const string& vcfPath, const string& locusId,
-    const LocusSpecification& locusSpec)
+    const LocusSpecification& locusSpec, bool onlyMetrics)
 {
     spdlog::info("Loading specification of locus {}", locusId);
 
@@ -124,6 +124,11 @@ static LocusResults analyzeLocus(
 
     spdlog::info("Generating metrics");
     auto metricsByVariant = getMetrics(locusSpec, topDiplotype, fragById, fragAssignment, fragPathAlignsById);
+
+	if (onlyMetrics) {
+		std::vector<LanePlot> lanePlots;
+		return { scoredDiplotypes, lanePlots, metricsByVariant };
+	}
 
     spdlog::info("Generating plot blueprint");
     auto lanePlots = generateBlueprint(topDiplotype, fragById, fragAssignment, fragPathAlignsById);
@@ -204,11 +209,12 @@ int runWorkflow(const WorkflowArguments& args)
     {
         try {
     	    auto locusSpec = locusCatalog.at(locusId);
-        	auto locusResults = analyzeLocus(args.referencePath, args.readsPath, args.vcfPath, locusId, locusSpec);
-
-
-			const auto svgPath = args.outputPrefix + "." + locusId + ".svg";
-			generateSvg(locusResults.lanePlots(), svgPath);
+            auto locusResults = analyzeLocus(args.referencePath, args.readsPath, args.vcfPath, locusId, locusSpec,
+                                             args.onlyMetrics);
+			if ( !args.onlyMetrics ) {
+				const auto svgPath = args.outputPrefix + "." + locusId + ".svg";
+				generateSvg(locusResults.lanePlots(), svgPath);
+			}
 
 			for (const auto& metrics : locusResults.metricsByVariant())
 			{

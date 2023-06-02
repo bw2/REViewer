@@ -27,6 +27,7 @@
 
 struct WorkflowArguments
 {
+    bool onlyMetrics;
     std::string readsPath;
     std::string vcfPath;
     std::string catalogPath;
