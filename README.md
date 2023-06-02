@@ -1,3 +1,11 @@
+## Note about this version of REViewer
+
+This fork of REViewer contains some minor usability improvements:
+- makes the --locus arg optional. If not specified, images will be generated for all loci in the variant catalog. 
+- adds an --only-metrics flag which causes REViewer to skip image generation and only output the metrics.tsv and phasing.tsv files. 
+- the original version of REViewer throws an error and exits if the variant catalog contains a locus with N's in the reference context. This fork makes REViewer print the error message and skip the locus instead.
+---
+
 # Repeat Expansion Viewer (REViewer)
 
 REViewer is a tool for visualizing alignments of reads in regions containing
