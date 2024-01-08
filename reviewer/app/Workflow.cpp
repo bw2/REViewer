@@ -22,6 +22,7 @@
 
 #include <set>
 #include <stdlib.h>
+#include <sstream>
 
 #include <boost/algorithm/string.hpp>
 
