@@ -30,7 +30,6 @@
 #include "app/Projection.hh"
 #include "core/GenomicRegion.hh"
 
-FragAssignment
-getBestFragAssignment(const std::vector<graphtools::Path>& hapPaths, const FragPathAlignsById& fragPathAlignsById);
+FragAssignment getBestFragAssignment(const std::vector<graphtools::Path>& hapPaths, const FragPathAlignsById& fragPathAlignsById);
 
 // FragAssignment removeFlankingReads(const FragPathAlignsById& infoByRead, const FragAssignment& fragAssignment);
