@@ -20,6 +20,7 @@
 
 #include "app/Aligns.hh"
 
+#include <algorithm>
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
@@ -80,13 +81,31 @@ FragById getAligns(const string& readsPath, const string& referencePath, const L
 
     // In case the reference is not fully compatible with the BAM
     faidx_t* referenceIndex = fai_load(referencePath.c_str());
+    if (!referenceIndex)
+    {
+        throw std::runtime_error("Failed to read reference index " + referencePath);
+    }
     const char* contigName = faidx_iseq(referenceIndex, region.contigIndex());
-    const int regionContigBamHeaderIndex = sam_hdr_name2tid(htsHeaderPtr, contigName);
+    if (!contigName)
+    {
+        fai_destroy(referenceIndex);
+        throw std::runtime_error("Failed to resolve contig for region");
+    }
+    const string contigNameStr(contigName);
+    const int regionContigBamHeaderIndex = sam_hdr_name2tid(htsHeaderPtr, contigNameStr.c_str());
     fai_destroy(referenceIndex);
+    if (regionContigBamHeaderIndex < 0)
+    {
+        throw std::runtime_error("Failed to find contig " + contigNameStr + " in BAM header");
+    }
 
     const auto& graph = locusSpec.regionGraph();
-    const auto queryRegionStart = region.start() - graph.nodeSeq(0).length();
+    const auto queryRegionStart = std::max(0, static_cast<int>(region.start() - graph.nodeSeq(0).length()));
     const auto queryRegionEnd = region.end() + graph.nodeSeq(graph.numNodes() - 1).length();
+    if (queryRegionStart >= queryRegionEnd)
+    {
+        throw std::runtime_error("Invalid query region bounds for " + contigNameStr);
+    }
     htsRegionPtr = sam_itr_queryi(htsIndexPtr, regionContigBamHeaderIndex, queryRegionStart, queryRegionEnd);
     if (htsRegionPtr == nullptr)
     {
@@ -124,24 +143,23 @@ FragById getAligns(const string& readsPath, const string& referencePath, const L
             throw std::runtime_error("All BAM alignments are required to have \"XG\" auxiliary tag");
         }
 
-        int auxPos = 0;
-        uint8_t* aux = bam_get_aux(htsAlignmentPtr);
-        const string tag(aux + auxPos, aux + auxPos + 2);
-        const string tagType(aux + auxPos + 2, aux + auxPos + 3);
-        auxPos += 3;
-        if (tag != "XG" || tagType != "Z")
+        uint8_t* aux = bam_aux_get(htsAlignmentPtr, "XG");
+        if (!aux)
         {
-            throw std::runtime_error("Unexpected auxiliary tag " + tag + ":" + tagType);
+            throw std::runtime_error("All BAM alignments are required to have \"XG\" auxiliary tag");
         }
-
-        int valueLen = 0;
-        while (*(aux + auxPos + valueLen) != '\0')
+        if (*aux != 'Z')
         {
-            ++valueLen;
+            throw std::runtime_error("Unexpected auxiliary tag XG:" + string(1, static_cast<char>(*aux)));
+        }
+        const char* cigarEncodingPtr = bam_aux2Z(aux);
+        if (!cigarEncodingPtr)
+        {
+            throw std::runtime_error("Failed to read XG auxiliary tag");
         }
 
         string fragmentId = bam_get_qname(htsAlignmentPtr);
-        const string cigarEncoding(aux + auxPos, aux + auxPos + valueLen);
+        const string cigarEncoding(cigarEncodingPtr);
         vector<string> pieces;
         boost::split(pieces, cigarEncoding, boost::is_any_of(","));
         assert(pieces.size() == 3);

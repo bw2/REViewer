@@ -11,7 +11,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.73 REQUIRED COMPONENTS program_options filesystem system)
+find_package(Boost 1.73 REQUIRED COMPONENTS program_options filesystem system iostreams)
 
 find_package(spdlog REQUIRED)
 find_package(ZLIB REQUIRED)

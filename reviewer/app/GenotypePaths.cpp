@@ -28,6 +28,9 @@
 #include <utility>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/optional.hpp>
 
 using boost::optional;
@@ -41,45 +44,79 @@ using std::stoi;
 using std::string;
 using std::vector;
 
-static vector<int> extractRepeatLengths(const string& vcfPath, const string& repeatId)
+static vector<int> parseRepeatLengthsFromStream(std::istream& vcfStream, const string& repeatId)
 {
-    std::ifstream vcfFile(vcfPath);
-    if (vcfFile.is_open())
+    const string query = "VARID=" + repeatId + ";";
+    string line;
+    while (getline(vcfStream, line))
     {
-        const string query = "VARID=" + repeatId + ";";
-        string line;
-        while (getline(vcfFile, line))
+        if (boost::find_first(line, query))
         {
-            if (boost::find_first(line, query))
+            vector<string> pieces;
+            boost::split(pieces, line, boost::is_any_of("\t"));
+            if (pieces.size() < 10)
             {
-                vector<string> pieces;
-                boost::split(pieces, line, boost::is_any_of("\t"));
-                const string sampleFields = pieces[pieces.size() - 1];
-                boost::split(pieces, sampleFields, boost::is_any_of(":"));
-                const string genotypeEncoding = pieces[2];
-
-                if (genotypeEncoding == "./.")
-                {
-                    throw runtime_error("Cannot create a plot because the genotype of " + repeatId + " is missing");
-                }
-
-                boost::split(pieces, genotypeEncoding, boost::is_any_of("/"));
-                vector<int> sizes;
-                for (const auto& sizeEncoding : pieces)
-                {
-                    sizes.push_back(stoi(sizeEncoding));
-                }
-                return sizes;
+                throw runtime_error("Malformed VCF record for " + repeatId);
             }
+            const string& formatField = pieces[8];
+            const string& sampleFields = pieces[9];
+            vector<string> formatPieces;
+            boost::split(formatPieces, formatField, boost::is_any_of(":"));
+            boost::split(pieces, sampleFields, boost::is_any_of(":"));
+            auto repcnIter = std::find(formatPieces.begin(), formatPieces.end(), "REPCN");
+            if (repcnIter == formatPieces.end())
+            {
+                throw runtime_error("Missing REPCN field for " + repeatId);
+            }
+            const auto repcnIndex = static_cast<size_t>(std::distance(formatPieces.begin(), repcnIter));
+            if (pieces.size() <= repcnIndex)
+            {
+                throw runtime_error("Missing REPCN sample value for " + repeatId);
+            }
+            const string genotypeEncoding = pieces[repcnIndex];
+
+            if (genotypeEncoding == "./.")
+            {
+                throw runtime_error("Cannot create a plot because the genotype of " + repeatId + " is missing");
+            }
+
+            boost::split(pieces, genotypeEncoding, boost::is_any_of("/"));
+            vector<int> sizes;
+            for (const auto& sizeEncoding : pieces)
+            {
+                sizes.push_back(stoi(sizeEncoding));
+            }
+            return sizes;
         }
-        vcfFile.close();
-    }
-    else
-    {
-        throw std::runtime_error("Unable to open file " + vcfPath);
     }
 
     throw std::runtime_error("No VCF record for " + repeatId);
+}
+
+static vector<int> extractRepeatLengths(const string& vcfPath, const string& repeatId)
+{
+    if (boost::algorithm::ends_with(vcfPath, "gz"))
+    {
+        std::ifstream vcfFile(vcfPath, std::ios::binary);
+        if (!vcfFile.is_open())
+        {
+            throw std::runtime_error("Unable to open file " + vcfPath);
+        }
+        boost::iostreams::filtering_istreambuf bufferedInputStream;
+        bufferedInputStream.push(boost::iostreams::gzip_decompressor());
+        bufferedInputStream.push(vcfFile);
+        std::istream decompressedStream(&bufferedInputStream);
+        return parseRepeatLengthsFromStream(decompressedStream, repeatId);
+    }
+    else
+    {
+        std::ifstream vcfFile(vcfPath);
+        if (!vcfFile.is_open())
+        {
+            throw std::runtime_error("Unable to open file " + vcfPath);
+        }
+        return parseRepeatLengthsFromStream(vcfFile, repeatId);
+    }
 }
 
 static vector<int> capLengths(int upperBound, const vector<int>& lengths)
@@ -212,7 +249,7 @@ vector<Diplotype> getCandidateDiplotypes(int meanFragLen, const string& vcfPath,
     auto genotypeNodesByNodeRange = getGenotypeNodesByNodeRange(meanFragLen, vcfPath, locusSpec);
 
     // Assume that all variants have the same number of alleles
-    const auto numAlleles = genotypeNodesByNodeRange.begin()->second.size();
+    const auto numAlleles = genotypeNodesByNodeRange.empty() ? 2 : genotypeNodesByNodeRange.begin()->second.size();
 
     vector<NodeVectors> nodesByDiplotype = { NodeVectors(numAlleles, { 0 }) };
 

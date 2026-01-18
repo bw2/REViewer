@@ -30,6 +30,9 @@
 #include <vector>
 
 #include <boost/optional.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 
 #include "spdlog/spdlog.h"
 #include "thirdparty/json/json.hpp"
@@ -198,15 +201,28 @@ static LocusDescriptionFromUser loadUserDescription(Json& locusJson, const Refer
 
 RegionCatalog loadLocusCatalogFromDisk(const string& catalogPath, const Reference& reference, int flankLength)
 {
-    std::ifstream inputStream(catalogPath.c_str());
-
-    if (!inputStream.is_open())
-    {
-        throw std::runtime_error("Failed to open catalog file " + catalogPath);
-    }
-
     Json catalogJson;
-    inputStream >> catalogJson;
+    if (boost::algorithm::ends_with(catalogPath, "gz"))
+    {
+        std::ifstream binaryInputStream(catalogPath.c_str(), std::ios::binary);
+        if (!binaryInputStream.is_open())
+        {
+            throw std::runtime_error("Failed to open catalog file " + catalogPath);
+        }
+        boost::iostreams::filtering_istreambuf bufferedInputStream;
+        bufferedInputStream.push(boost::iostreams::gzip_decompressor());
+        bufferedInputStream.push(binaryInputStream);
+        std::istream(&bufferedInputStream) >> catalogJson;
+    }
+    else
+    {
+        std::ifstream inputStream(catalogPath.c_str());
+        if (!inputStream.is_open())
+        {
+            throw std::runtime_error("Failed to open catalog file " + catalogPath);
+        }
+        inputStream >> catalogJson;
+    }
     makeArray(catalogJson);
 
     RegionCatalog catalog;

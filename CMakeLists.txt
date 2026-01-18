@@ -44,7 +44,7 @@ ExternalProject_Add(Boost
 	URL https://downloads.sourceforge.net/project/boost/boost/1.73.0/boost_1_73_0.tar.bz2
 	PATCH_COMMAND ${BOOST_PATCH_COMMAND}
 	CONFIGURE_COMMAND ./bootstrap.sh --prefix=${installDir}
-	BUILD_COMMAND ./b2 install -j8 --with-filesystem --with-system --with-program_options link=static ${B2_OPTIONS}
+	BUILD_COMMAND ./b2 install -j8 --with-filesystem --with-system --with-program_options --with-iostreams link=static ${B2_OPTIONS}
 	INSTALL_COMMAND ""
 )
 
