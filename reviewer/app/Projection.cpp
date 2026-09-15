@@ -21,6 +21,7 @@
 #include "app/Projection.hh"
 
 #include <algorithm>
+#include <limits>
 #include <set>
 #include <string>
 

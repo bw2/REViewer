@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <stdexcept>
 #include <utility>

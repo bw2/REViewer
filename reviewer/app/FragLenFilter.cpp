@@ -20,6 +20,8 @@
 
 #include "app/FragLenFilter.hh"
 
+#include <limits>
+
 static int calcFragLen(const ReadPathAlign& readAlign, const ReadPathAlign& mateAlign)
 {
     if (readAlign.pathIndex != mateAlign.pathIndex)

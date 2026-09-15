@@ -58,7 +58,7 @@ ExternalProject_Add(spdlog
 
 
 ExternalProject_Add(catch2
-	URL https://github.com/catchorg/Catch2/archive/refs/tags/v2.12.4.tar.gz
+	URL https://github.com/catchorg/Catch2/archive/refs/tags/v2.13.10.tar.gz
 	CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${installDir}
 		-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
 		-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
